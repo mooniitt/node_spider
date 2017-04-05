@@ -1,0 +1,27 @@
+{
+  "name": "node_spider",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+        "request":"",
+        "request-progress":"",
+        "async":"",
+        "del":"",
+        "trim":""
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mooniitt/node_spider.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mooniitt/node_spider/issues"
+  },
+  "homepage": "https://github.com/mooniitt/node_spider#readme"
+}
