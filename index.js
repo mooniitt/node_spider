@@ -8,7 +8,7 @@ const trim = require("trim")
 const querystring = require('querystring')
 let MAX = 10
 console.time()
-let url = "http://tieba.baidu.com/f?kw=dota2&fr=index&red_tag=a0622355900"
+let url = "http://tieba.baidu.com/f?ie=utf-8&kw=%E8%B6%8A%E7%8B%B1&fr=search"
 let count = 0
 if(!fs.existsSync("./image")){
 	fs.mkdirSync("./image")
