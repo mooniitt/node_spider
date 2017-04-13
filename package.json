@@ -4,11 +4,10 @@
   "description": "",
   "main": "index.js",
   "dependencies": {
-        "request":"",
-        "request-progress":"",
-        "async":"",
-        "del":"",
-        "trim":""
+        "request":"^2.81.0",
+        "request-progress":"^3.0.0",
+        "async":"^2.3.0",
+        "del":"^2.2.2"
   },
   "devDependencies": {},
   "scripts": {

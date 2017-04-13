@@ -2,13 +2,12 @@ const request = require("request")
 const progress = require("request-progress")
 const async = require("async")
 const fs = require("fs")
-
 const del = require("del")
-const trim = require("trim")
-const querystring = require('querystring')
+// const querystring = require('querystring')
 let MAX = 10
-console.time()
-let url = "http://tieba.baidu.com/f?ie=utf-8&kw=%E8%B6%8A%E7%8B%B1&fr=search"
+// console.time()
+// let url = "http://tieba.baidu.com/f?ie=utf-8&kw=%E8%B6%8A%E7%8B%B1&fr=search"
+let url = ''
 let count = 0
 if(!fs.existsSync("./image")){
 	fs.mkdirSync("./image")
@@ -16,6 +15,7 @@ if(!fs.existsSync("./image")){
 del.sync("./image/*")
 var readCfgUrls = function(){
 	const config = require("./cfg")
+	return config.url
 }
 // var content = new iconv('gb2312','UTF8').convert('%CB%CE%D6%C7%D0%A2').toString()
 var getImgUrl = function(str){//获取每页url中的图片地址
@@ -24,7 +24,7 @@ var getImgUrl = function(str){//获取每页url中的图片地址
 	if(s){
 		reg = /http.*?\"/
 		for(let i in s){
-			 s[i] = trim(s[i].match(reg).join().slice(0,-1))
+			 s[i] = s[i].match(reg).join().slice(0,-1).trim()
 		}
 		reg = /baidu/
 		for(let i in s){
@@ -66,18 +66,19 @@ var configInit = function(){
 }
 
 //e.g http://imgsrc.baidu.com/forum/w%3D580/sign=fd030bb29edda144da096cba82b6d009/bcf3d7ca7bcb0a4603cb24986263f6246a60afa3.jpg
-var downLoadImg = function(image_url,cb){//下载图片
+var downLoadImg = function(image_url,callback){//下载图片
 		let name = "./image/"+image_url.split("/").reverse()[0].split("?")[0]
 		progress(request(image_url))
 		.on('error',(err)=>{
 			console.log(err)
 		})
 		.on('end',()=>{
-			console.log(`	正在抓取第${++count}张 : ${name}`)
-			cb()
+			console.log(`正在抓取第${++count}张 : ${name}`)
+			callback()
 		})
 		.pipe(fs.createWriteStream(name))
 }
+// downLoadImg("http://imgsrc.baidu.com/forum/w%3D580/sign=fd030bb29edda144da096cba82b6d009/bcf3d7ca7bcb0a4603cb24986263f6246a60afa3.jpg")
 
 //e.g http://tieba.baidu.com/p/4972127955
 var allUrlsOfImg_Page = function(page_url,callback){
@@ -88,7 +89,7 @@ var allUrlsOfImg_Page = function(page_url,callback){
 		}
 		let image_urls = getImgUrl(body)
 		let len = image_urls.length
-		async.eachLimit(image_urls,6,(url,cb)=>{
+		async.each(image_urls,(url,cb)=>{
 			downLoadImg(url,cb)
 		},()=>{
 			callback()
@@ -112,7 +113,7 @@ var startCatch = function(url,max){//开始抓取
 				let surl = []
 				err?console.log(err):()=>{return}
 				surl = getPageUrl(body)
-				async.eachLimit(surl,2,(url,cb)=>{
+				async.eachLimit(surl,6,(url,cb)=>{
 					allUrlsOfImg_Page(url,cb)
 				},()=>{
 					// console.log(`第${page++}页抓取完毕!`)
@@ -136,6 +137,7 @@ var getEveryPageUrl = function(url,max){//获取每页的url
 	// console.log(everyPageUrl)
 	return everyPageUrl
 }
-
-startCatch(url)
+// configInit()
+url = readCfgUrls()
+startCatch(url,1)
 
