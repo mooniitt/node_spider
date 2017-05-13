@@ -1,6 +1,5 @@
 {
-	"clearImageFile":false,
-	"kw":"",
-	"Page":10,
-	"url":"http://tieba.baidu.com/f?kw=%CB%CE%D6%C7%D0%A2"
+	"clearImageFile": false,
+	"Page": 10,
+	"urls": ["http://tieba.baidu.com/f?kw=%CB%CE%D6%C7%D0%A2&fr=ala0&loc=rec"]
 }
