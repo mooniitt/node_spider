@@ -6,6 +6,9 @@ const del = require("del")
 const querystring = require("querystring")
 const http = require("http")
 const https = require("https")
+const path = require("path")
+const chalk = require("chalk")
+const q = require("q")
 	// const querystring = require('querystring')
 let MAX = 10
 	// console.time()
@@ -19,8 +22,8 @@ del.sync("./image/*")
 
 var readCfgUrls = function() {
 	const config = require("./cfg")
-	let url = config.urls[0]
-
+	let url = config.urls[0].toString()
+		// console.log(url)
 	return url
 }
 
@@ -42,49 +45,62 @@ var getImgUrl = function(str) { //获取每页url中的图片地址
 	}
 	return []
 }
-var getPageUrl = function(str) { //获取每页的url
-	let reg = /p\/[0-9]*/g
-	let s = str.match(reg)
-	let uriCode = "https://tieba.baidu.com/"
-	for (let i in s) {
-		s[i] = uriCode + s[i]
-	}
-	return s
-}
-var getMaxPage = function(url) { //获取最大的page页数
-	let reg = /pn=.*last pag/g
-	let protocol = url.split(":")[0]
-	let rawData = ''
-	if (protocol === 'http') {
-		http.get(url, (res) => {
-			if (res.statusCode !== 200) {
-				console.log("http request error!")
-				throw new error
-			}
-			res.on('data', (chunk) => {
-				rawData += chunk
-			})
-			res.on('end', () => {
-				let max = rawData.match(reg).join().split("\"")[0].split('=')[1] / 50
-				console.log(max)
-			})
-		})
-	} else if (protocol === 'https') {
-		https.get(url, (res) => {
-			if (res.statusCode !== 200) {
-				console.log("https request error!")
-				throw new error
-			}
-			res.on('data', (chunk) => {
-				rawData += chunk
-			})
-			res.on('end', () => {
-				let max = rawData.match(reg).join().split("\"")[0].split('=')[1] / 50
-				console.log(max)
-			})
-		})
-	}
 
+//选择http还是https请求
+function chooseProtocol(url) {
+	var protocol = ''
+	protocol = url.split(":")[0]
+	return protocol === 'http' ? http : https
+}
+
+//根据getEveryPageUrl获取到的url,返回整个页面所有帖子的url
+var getPageUrl = function(url) {
+	let reg = /\/p\/[0-9]*/g,
+		method = null,
+		body = '',
+		protocol = '',
+		deferred = q.defer()
+	protocol = url.split(":")[0]
+	method = chooseProtocol(url)
+	method.get(url, (res) => {
+		// console.log(res)
+		res.on('data', (chunk) => {
+			body += chunk
+		})
+		res.on('end', () => {
+			// console.log(body.match(reg))
+			let urls = body.match(reg)
+			deferred.resolve(urls.map((val, index) => {
+				return protocol + "://tieba.baidu.com" + val
+			}))
+		})
+	})
+	return deferred.promise
+}
+
+//获取最大的page页数
+var getMaxPage = function(tieba_url) {
+	let reg = /pn=.*last pag/g,
+		protocol = tieba_url.split(":")[0],
+		rawData = '',
+		max = '',
+		method = null
+	method = chooseProtocol(tieba_url)
+	let deferred = q.defer()
+	method.get(tieba_url, (res) => {
+		if (res.statusCode !== 200) {
+			console.log(protocol + " request error!")
+		}
+		res.on('data', (chunk) => {
+			rawData += chunk
+		})
+		res.on('end', () => {
+			max = rawData.match(reg).join().split("\"")[0].split('=')[1] / 50
+			deferred.resolve(max)
+				// return max
+		})
+	})
+	return deferred.promise
 }
 
 var configInit = function() {
@@ -106,92 +122,141 @@ var configInit = function() {
 }
 
 //e.g http://imgsrc.baidu.com/forum/w%3D580/sign=fd030bb29edda144da096cba82b6d009/bcf3d7ca7bcb0a4603cb24986263f6246a60afa3.jpg
-var downLoadImg = function(image_url, callback) { //下载图片
-		let name = "./image/" + image_url.split("/").reverse()[0].split("?")[0]
-		progress(request(image_url))
-			.on('error', (err) => {
-				console.log(err)
+var downLoadImg = function(image_url) { //下载图片
+	let name = "./image/" + image_url.split("/").reverse()[0].split("?")[0],
+		imgData = '',
+		method = null,
+		localpath = '',
+		deferred = q.defer()
+	method = chooseProtocol(image_url)
+	method.get(image_url, (res) => {
+		let n = ++count
+		console.log(`正在抓取第${n}张 : ${name}`)
+		res.setEncoding('binary')
+		res.on('data', (chunk) => {
+			imgData += chunk
+		})
+		res.on('end', () => {
+			localpath = path.resolve(__dirname, name)
+			fs.writeFile(localpath, imgData, "binary", (err) => {
+				if (!err) {
+					// console.log(`抓取成功！ `)
+					console.log(`第${n}张 : 抓取成功！`)
+					deferred.resolve()
+				} else {
+					console.log(`第${n}张 : 抓取失败！`)
+						// deferred.rejected()
+					deferred.resolve()
+				}
 			})
-			.on('end', () => {
-				console.log(`正在抓取第${++count}张 : ${name}`)
-				callback()
-			})
-			.pipe(fs.createWriteStream(name))
-	}
-	// downLoadImg("http://imgsrc.baidu.com/forum/w%3D580/sign=fd030bb29edda144da096cba82b6d009/bcf3d7ca7bcb0a4603cb24986263f6246a60afa3.jpg")
-
-//e.g http://tieba.baidu.com/p/4972127955
-var allUrlsOfImg_Page = function(page_url, callback) {
-	request(page_url, (err, res, body) => {
-		if (err) {
-			console.log(err)
-			return
-		}
-		let image_urls = getImgUrl(body)
-		let len = image_urls.length
-		async.each(image_urls, (url, cb) => {
-			downLoadImg(url, cb)
-		}, () => {
-			callback()
 		})
 	})
+	return deferred.promise
+}
+
+// downLoadImg("http://imgsrc.baidu.com/forum/w%3D580/sign=fd030bb29edda144da096cba82b6d009/bcf3d7ca7bcb0a4603cb24986263f6246a60afa3.jpg")
+
+//e.g http://tieba.baidu.com/p/4972127955
+//返回每个帖子中所有的图片的地址
+var allUrlsOfImg_Page = function(page_url, callback) {
+	let method = null,
+		body = '',
+		image_urls = [],
+		deferred = q.defer()
+	method = chooseProtocol(page_url)
+	method.get(page_url, (res) => {
+		res.on('data', (chunk) => {
+			body += chunk
+		})
+		res.on('end', () => {
+			image_urls = getImgUrl(body)
+				// console.log(image_urls)
+			deferred.resolve(image_urls)
+				// return image_urls
+		})
+	})
+	return deferred.promise
+}
+
+//获取每页的url
+var getEveryPageUrl = function(url, max) {
+	let everyPageUrl = [],
+		n = 0,
+		host = '',
+		query = ''
+	host = url.split("?")[0]
+	query = url.split("kw")[1].split("&")[0].slice(1)
+	urlCode = host + "?kw=" + query + "&ie=utf-8&pn="
+	while (n <= max) {
+		everyPageUrl.push(urlCode + n * 50)
+		n += 1
+	}
+	// console.log(everyPageUrl)
+	return everyPageUrl
 }
 
 // allUrlsOfImg_Page("http://tieba.baidu.com/p/5016314264")
 // downLoadImg("http://imgsrc.baidu.com/forum/w%3D580/sign=fd030bb29edda144da096cba82b6d009/bcf3d7ca7bcb0a4603cb24986263f6246a60afa3.jpg")
 
-var startCatch = function(url, max) { //开始抓取
+var startCatch = function() { //开始抓取
 	let everyUrl = [],
-		page = 1
-	request(url, (err, res, body) => {
-		err ? console.log(err) : () => {
-			return
-		}
-		max = max ? max : getMaxPage(body) //尾页是多少
-		console.log(`抓取${max}页`)
-		everyUrl = getEveryPageUrl(url, max) //获取每页的URL
-		console.log(everyUrl)
-		async.eachLimit(everyUrl, 1, (url, callback) => {
-			request(url, (err, res, body) => {
-				let surl = []
-				err ? console.log(err) : () => {
-					return
-				}
-				surl = getPageUrl(body)
-				async.eachLimit(surl, 6, (url, cb) => {
-					allUrlsOfImg_Page(url, cb)
+		pageUrls = [],
+		tieba_url = '',
+		maxPage = ''
+
+	tieba_url = readCfgUrls()
+	getMaxPage(tieba_url).then((max) => {
+		// console.log(tieba_url)
+		console.log(max)
+		console.log(tieba_url)
+		everyUrl = getEveryPageUrl(tieba_url, max)
+			// console.log(everyUrl)
+		async.eachLimit(everyUrl, 1, (url, url_callback) => {
+			getPageUrl(url).then((urls) => {
+				// console.log(urls)
+				pageUrls = urls
+				async.eachLimit(pageUrls, 1, (pageurl, pageUrls_callback) => {
+					allUrlsOfImg_Page(pageurl).then((imgUrls) => {
+						console.log(imgUrls)
+						if (imgUrls.length) {
+							async.eachLimit(imgUrls, 1, (imgurl, imgUrls_callback) => {
+								downLoadImg(imgurl).then(() => {
+									imgUrls_callback()
+								})
+							}, () => {
+								pageUrls_callback()
+								console.log("该帖子所有图片抓取完毕!")
+							})
+						} else {
+							pageUrls_callback()
+							console.log("该帖子所有图片抓取完毕!")
+						}
+					})
 				}, () => {
-					// console.log(`第${page++}页抓取完毕!`)
-					callback()
+					url_callback()
 				})
 			})
-		}, () => {
-			console.log(`结束`)
-			console.time()
 		})
+
+		// async.eachLimit(everyUrl, 1, (url, callback) => {
+		// 	getPageUrl(pageUrls).then((urls) => {
+		// 		// console.log(urls)
+		// 		pageUrls = url
+		// 	})
+		// })
 	})
 }
-var getEveryPageUrl = function(url, max) { //获取每页的url
-		let everyPageUrl = [],
-			n = 1
-		everyPageUrl.push(url)
-		let urlCode = url + "&ie=utf-8&pn="
-		while (n < max) {
-			everyPageUrl.push(urlCode + n * 50)
-			n += 1
-		}
-		// console.log(everyPageUrl)
-		return everyPageUrl
-	}
-	// configInit()
-url = readCfgUrls()
-	// startCatch(url, 1)
 
-console.log(url)
-getMaxPage(url)
-	// https.get(url, (res) => {
-	// 	console.log(res.statusCode)
-	// })
+
+// configInit()
+// url = readCfgUrls()
+startCatch()
+
+// console.log(url)
+// getMaxPage(url)
+// https.get(url, (res) => {
+// 	console.log(res.statusCode)
+// })
 
 // console.log(url)
 // console.log(querystring.parse(url))
@@ -202,5 +267,6 @@ module.exports = {
 	getMaxPage,
 	getPageUrl,
 	getImgUrl,
-	readCfgUrls
+	readCfgUrls,
+	downLoadImg
 }
