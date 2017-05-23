@@ -215,11 +215,11 @@ var startCatch = function() { //开始抓取
 			getPageUrl(url).then((urls) => {
 				// console.log(urls)
 				pageUrls = urls
-				async.eachLimit(pageUrls, 1, (pageurl, pageUrls_callback) => {
+				async.eachLimit(pageUrls, 2, (pageurl, pageUrls_callback) => {
 					allUrlsOfImg_Page(pageurl).then((imgUrls) => {
 						console.log(imgUrls)
 						if (imgUrls.length) {
-							async.eachLimit(imgUrls, 1, (imgurl, imgUrls_callback) => {
+							async.eachLimit(imgUrls, 3, (imgurl, imgUrls_callback) => {
 								downLoadImg(imgurl).then(() => {
 									imgUrls_callback()
 								})
